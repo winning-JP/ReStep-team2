@@ -1,0 +1,7 @@
+.env
+data/db/
+data/phpmyadmin/sessions/
+.vscode
+.DS_Store
+*.xcuserstate
+xcuserdata/

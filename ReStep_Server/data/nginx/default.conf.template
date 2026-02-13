@@ -1,0 +1,36 @@
+server {
+    listen 80;
+    server_name _;
+
+    root /var/www/html/public;
+    index index.php;
+
+    add_header 'Access-Control-Allow-Origin' '${CORS_ORIGIN}' always;
+    add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS' always;
+    add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization' always;
+    add_header 'Access-Control-Allow-Credentials' 'true' always;
+
+    if ($request_method = OPTIONS) {
+        return 204;
+    }
+
+    error_page 404 = @json404;
+
+    location @json404 {
+        default_type application/json;
+        return 404 '{"success":false,"error":"Not Found","code":404}';
+    }
+
+    location / {
+        try_files $uri /index.php?$query_string;
+    }
+
+    location ~ \.php$ {
+        try_files $uri =404;
+
+        include fastcgi_params;
+        fastcgi_pass php:9000;
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+    }
+}

@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<gpx version="1.1" creator="Xcode">
+    <wpt lat="35.681111" lon="139.766667">
+        <name>東京駅</name>
+        <time>2024-12-01T15:04:00Z</time>
+    </wpt>
+    <wpt lat="35.691667" lon="139.770833">
+        <name>神田駅</name>
+        <time>2024-12-01T15:04:30Z</time>
+    </wpt>
+    <wpt lat="35.698333" lon="139.773056">
+        <name>秋葉原駅</name>
+        <time>2024-12-01T15:05:00Z</time>
+    </wpt>
+    <wpt lat="35.707417" lon="139.774639">
+        <name>御徒町駅</name>
+        <time>2024-12-01T15:05:30Z</time>
+    </wpt>
+    <wpt lat="35.713889" lon="139.777222">
+        <name>上野駅</name>
+        <time>2024-12-01T15:06:00Z</time>
+    </wpt>
+</gpx>
