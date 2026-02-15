@@ -738,7 +738,7 @@ private struct OnboardingProfileBasicsView: View {
                                         Text("未設定").tag("未設定")
                                         Text("男性").tag("男性")
                                         Text("女性").tag("女性")
-                                        Text("その他").tag("その他")
+//                                        Text("その他").tag("その他")
                                     }
                                     .pickerStyle(.segmented)
                                     .controlSize(.small)

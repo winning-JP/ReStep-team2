@@ -6,6 +6,7 @@ struct EncounterSlotView: View {
     private let symbols = ["🍒", "⭐️", "🔔", "🍋", "💎", "7️⃣", "🍀"]
     private let symbolWeights = [20, 16, 14, 18, 8, 4, 10]
     private let wallet = WalletAPIClient.shared
+    @StateObject private var coinTracker = CoinUsageTracker.shared
     @State private var reels: [Int] = [0, 1, 2]
     @State private var reelSpinning: [Bool] = [false, false, false]
     @State private var resultText: String = "レバーを引いてね"
@@ -279,6 +280,10 @@ struct EncounterSlotView: View {
             resultText = "コインが足りません"
             return
         }
+        guard coinTracker.canUse(bet) else {
+            resultText = "本日のコイン使用上限(\(coinTracker.dailyLimit))に達しました"
+            return
+        }
 
         isSpending = true
         resultText = "コイン消費中..."
@@ -286,9 +291,10 @@ struct EncounterSlotView: View {
 
         Task {
             do {
-                let response = try await wallet.useCoins(amount: bet, reason: "slot", clientRequestId: requestId)
+                let response = try await wallet.useCoinsDaily(amount: bet, reason: "slot", clientRequestId: requestId)
                 await MainActor.run {
                     credits = response.balance
+                    coinTracker.recordUsage(bet)
                     isSpending = false
                     startSpin()
                 }

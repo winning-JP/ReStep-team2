@@ -1163,6 +1163,348 @@ switch ($action) {
             break;
         }
 
+    /* ============================
+       COIN DAILY USAGE APIs
+    ============================ */
+
+    case "coin_daily_usage": {
+            // 本日のコイン使用状況を取得
+            $user = require_login($pdo);
+            $date_key = date("Y-m-d");
+
+            $stmt = $pdo->prepare("SELECT used, daily_limit FROM coin_daily_usage WHERE user_id = ? AND date_key = ? LIMIT 1");
+            $stmt->execute([(int)$user["id"], $date_key]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            $used = $row ? (int)$row["used"] : 0;
+            $daily_limit = $row ? (int)$row["daily_limit"] : 500;
+
+            send_response(200, [
+                "user_id" => (int)$user["id"],
+                "date_key" => $date_key,
+                "used" => $used,
+                "daily_limit" => $daily_limit,
+                "remaining" => max(0, $daily_limit - $used)
+            ]);
+            break;
+        }
+
+    case "coin_use_daily": {
+            // 日次使用量チェック付きコイン消費
+            $user = require_login($pdo);
+
+            [$amount, $err] = require_int_field("amount", 1, 1000000000);
+            if ($err) send_error(422, "validation_error", "Invalid fields", null, ["amount" => $err], "validation.amount");
+
+            [$reason, $rerr] = require_string_field("reason", 255, false);
+            if ($rerr) send_error(422, "validation_error", "Invalid fields", null, ["reason" => $rerr]);
+
+            [$client_request_id, $cerr] = require_string_field("client_request_id", 64, false);
+            if ($cerr) send_error(422, "validation_error", "Invalid fields", null, ["client_request_id" => $cerr]);
+
+            $date_key = date("Y-m-d");
+            $uid = (int)$user["id"];
+
+            $pdo->beginTransaction();
+            try {
+                // ウォレット存在確認
+                ensure_wallet_exists($pdo, $uid);
+
+                // 日次使用量を確認
+                $stmt_daily = $pdo->prepare("SELECT used, daily_limit FROM coin_daily_usage WHERE user_id = ? AND date_key = ? FOR UPDATE");
+                $stmt_daily->execute([$uid, $date_key]);
+                $daily_row = $stmt_daily->fetch(PDO::FETCH_ASSOC);
+
+                $used = $daily_row ? (int)$daily_row["used"] : 0;
+                $daily_limit = $daily_row ? (int)$daily_row["daily_limit"] : 500;
+                $remaining = $daily_limit - $used;
+
+                if ($amount > $remaining) {
+                    $pdo->rollBack();
+                    send_error(429, "daily_limit_exceeded", "Daily coin usage limit exceeded", [
+                        "used" => $used,
+                        "daily_limit" => $daily_limit,
+                        "remaining" => max(0, $remaining),
+                        "requested" => $amount
+                    ], null, "coin.daily_limit");
+                }
+
+                // 冪等チェック
+                if ($client_request_id) {
+                    $check = $pdo->prepare("SELECT id, balance_after FROM coin_transactions WHERE user_id = ? AND client_request_id = ? LIMIT 1");
+                    $check->execute([$uid, $client_request_id]);
+                    $existing = $check->fetch(PDO::FETCH_ASSOC);
+                    if ($existing) {
+                        $pdo->commit();
+                        send_response(200, [
+                            "message" => "ok",
+                            "user_id" => $uid,
+                            "used" => $amount,
+                            "balance" => (int)$existing["balance_after"],
+                            "daily_used" => $used,
+                            "daily_limit" => $daily_limit,
+                            "daily_remaining" => max(0, $daily_limit - $used),
+                            "transaction_id" => (int)$existing["id"],
+                            "idempotent" => true
+                        ]);
+                    }
+                }
+
+                // コイン残高チェック＆消費
+                $stmt_bal = $pdo->prepare("SELECT balance FROM user_wallets WHERE user_id = ? FOR UPDATE");
+                $stmt_bal->execute([$uid]);
+                $bal_row = $stmt_bal->fetch(PDO::FETCH_ASSOC);
+                $coin_balance = $bal_row ? (int)$bal_row["balance"] : 0;
+
+                if ($coin_balance < $amount) {
+                    $pdo->rollBack();
+                    send_error(409, "insufficient_coins", "Not enough coins", [
+                        "balance" => $coin_balance,
+                        "required" => $amount
+                    ], null, "coin.insufficient");
+                }
+
+                $new_balance = $coin_balance - $amount;
+                $up_bal = $pdo->prepare("UPDATE user_wallets SET balance = ? WHERE user_id = ?");
+                $up_bal->execute([$new_balance, $uid]);
+
+                // コイン取引記録
+                $meta_json = json_encode(["amount" => $amount, "daily" => true], JSON_UNESCAPED_UNICODE);
+                $ins_tx = $pdo->prepare("
+                    INSERT INTO coin_transactions (user_id, delta, type, reason, meta, balance_after, client_request_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ");
+                $ins_tx->execute([$uid, -$amount, "spend", $reason ?? "spend", $meta_json, $new_balance, $client_request_id]);
+                $tx_id = (int)$pdo->lastInsertId();
+
+                // 日次使用量を更新
+                if ($daily_row) {
+                    $up = $pdo->prepare("UPDATE coin_daily_usage SET used = used + ? WHERE user_id = ? AND date_key = ?");
+                    $up->execute([$amount, $uid, $date_key]);
+                } else {
+                    $ins = $pdo->prepare("INSERT INTO coin_daily_usage (user_id, date_key, used, daily_limit) VALUES (?, ?, ?, 500)");
+                    $ins->execute([$uid, $date_key, $amount]);
+                }
+
+                $pdo->commit();
+
+                send_response(200, [
+                    "message" => "ok",
+                    "user_id" => $uid,
+                    "used" => $amount,
+                    "balance" => $new_balance,
+                    "daily_used" => $used + $amount,
+                    "daily_limit" => $daily_limit,
+                    "daily_remaining" => max(0, $daily_limit - $used - $amount),
+                    "transaction_id" => $tx_id,
+                    "idempotent" => false
+                ]);
+            } catch (PDOException $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                send_error(500, "db_error", "Database error", $e->getMessage());
+            } catch (Exception $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                send_error(500, "server_error", "Server error", $e->getMessage());
+            }
+            break;
+        }
+
+    /* ============================
+       GOLD STAMP APIs
+    ============================ */
+
+    case "gold_stamp_get": {
+            // ゴールドスタンプ残高取得
+            $user = require_login($pdo);
+            $uid = (int)$user["id"];
+
+            $stmt = $pdo->prepare("SELECT balance, total_earned FROM gold_stamps WHERE user_id = ? LIMIT 1");
+            $stmt->execute([$uid]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            send_response(200, [
+                "user_id" => $uid,
+                "balance" => $row ? (int)$row["balance"] : 0,
+                "total_earned" => $row ? (int)$row["total_earned"] : 0
+            ]);
+            break;
+        }
+
+    case "gold_stamp_exchange": {
+            // コイン5000 → ゴールドスタンプ1枚に交換
+            $user = require_login($pdo);
+            $uid = (int)$user["id"];
+            $cost = 5000;
+
+            [$client_request_id, $cerr] = require_string_field("client_request_id", 64, false);
+            if ($cerr) send_error(422, "validation_error", "Invalid fields", null, ["client_request_id" => $cerr]);
+
+            $pdo->beginTransaction();
+            try {
+                // コイン消費
+                ensure_wallet_exists($pdo, $uid);
+                $stmt = $pdo->prepare("SELECT balance FROM user_wallets WHERE user_id = ? FOR UPDATE");
+                $stmt->execute([$uid]);
+                $row = $stmt->fetch(PDO::FETCH_ASSOC);
+                $coin_balance = $row ? (int)$row["balance"] : 0;
+
+                if ($coin_balance < $cost) {
+                    $pdo->rollBack();
+                    send_error(409, "insufficient_coins", "Not enough coins for gold stamp exchange", [
+                        "balance" => $coin_balance,
+                        "required" => $cost
+                    ], null, "coin.insufficient");
+                }
+
+                // ゴールドスタンプ交換は日次上限の対象外（ゲーム用の制限のため）
+
+                // コイン残高を減算
+                $new_coin = $coin_balance - $cost;
+                $up_coin = $pdo->prepare("UPDATE user_wallets SET balance = ? WHERE user_id = ?");
+                $up_coin->execute([$new_coin, $uid]);
+
+                // コイン取引記録
+                $meta_json = json_encode(["type" => "gold_stamp_exchange", "cost" => $cost], JSON_UNESCAPED_UNICODE);
+                $ins_tx = $pdo->prepare("
+                    INSERT INTO coin_transactions (user_id, delta, type, reason, meta, balance_after, client_request_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ");
+                $ins_tx->execute([$uid, -$cost, "spend", "gold_stamp_exchange", $meta_json, $new_coin, $client_request_id]);
+
+                // ゴールドスタンプ付与
+                $stmt_gs = $pdo->prepare("SELECT balance, total_earned FROM gold_stamps WHERE user_id = ? FOR UPDATE");
+                $stmt_gs->execute([$uid]);
+                $gs_row = $stmt_gs->fetch(PDO::FETCH_ASSOC);
+
+                if ($gs_row) {
+                    $gs_balance = (int)$gs_row["balance"] + 1;
+                    $gs_total = (int)$gs_row["total_earned"] + 1;
+                    $up_gs = $pdo->prepare("UPDATE gold_stamps SET balance = ?, total_earned = ? WHERE user_id = ?");
+                    $up_gs->execute([$gs_balance, $gs_total, $uid]);
+                } else {
+                    $gs_balance = 1;
+                    $gs_total = 1;
+                    $ins_gs = $pdo->prepare("INSERT INTO gold_stamps (user_id, balance, total_earned) VALUES (?, 1, 1)");
+                    $ins_gs->execute([$uid]);
+                }
+
+                // ゴールドスタンプ取引記録
+                $ins_gs_tx = $pdo->prepare("
+                    INSERT INTO gold_stamp_transactions (user_id, delta, type, reason, balance_after, client_request_id)
+                    VALUES (?, 1, 'exchange', 'coin_to_gold_stamp', ?, ?)
+                ");
+                $ins_gs_tx->execute([$uid, $gs_balance, $client_request_id]);
+
+                $pdo->commit();
+
+                send_response(200, [
+                    "message" => "ok",
+                    "user_id" => $uid,
+                    "coin_balance" => $new_coin,
+                    "coin_used" => $cost,
+                    "gold_stamp_balance" => $gs_balance,
+                    "gold_stamp_total_earned" => $gs_total
+                ]);
+            } catch (PDOException $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                send_error(500, "db_error", "Database error", $e->getMessage());
+            } catch (Exception $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                send_error(500, "server_error", "Server error", $e->getMessage());
+            }
+            break;
+        }
+
+    case "gold_stamp_use": {
+            // ゴールドスタンプ消費（コイン上限拡張 or 景品交換）
+            $user = require_login($pdo);
+            $uid = (int)$user["id"];
+
+            [$amount, $err] = require_int_field("amount", 1, 10000);
+            if ($err) send_error(422, "validation_error", "Invalid fields", null, ["amount" => $err]);
+
+            [$use_type, $terr] = require_string_field("use_type", 32, true);
+            if ($terr) send_error(422, "validation_error", "Invalid fields", null, ["use_type" => $terr]);
+
+            [$client_request_id, $cerr] = require_string_field("client_request_id", 64, false);
+            if ($cerr) send_error(422, "validation_error", "Invalid fields", null, ["client_request_id" => $cerr]);
+
+            if (!in_array($use_type, ["coin_limit_expand", "prize_exchange"])) {
+                send_error(400, "bad_request", "use_type must be 'coin_limit_expand' or 'prize_exchange'");
+            }
+
+            $pdo->beginTransaction();
+            try {
+                $stmt = $pdo->prepare("SELECT balance FROM gold_stamps WHERE user_id = ? FOR UPDATE");
+                $stmt->execute([$uid]);
+                $row = $stmt->fetch(PDO::FETCH_ASSOC);
+                $gs_balance = $row ? (int)$row["balance"] : 0;
+
+                if ($gs_balance < $amount) {
+                    $pdo->rollBack();
+                    send_error(409, "insufficient_gold_stamps", "Not enough gold stamps", [
+                        "balance" => $gs_balance,
+                        "required" => $amount
+                    ], null, "gold_stamp.insufficient");
+                }
+
+                $new_gs = $gs_balance - $amount;
+                $up = $pdo->prepare("UPDATE gold_stamps SET balance = ? WHERE user_id = ?");
+                $up->execute([$new_gs, $uid]);
+
+                // 取引記録
+                $ins_tx = $pdo->prepare("
+                    INSERT INTO gold_stamp_transactions (user_id, delta, type, reason, balance_after, client_request_id)
+                    VALUES (?, ?, 'spend', ?, ?, ?)
+                ");
+                $ins_tx->execute([$uid, -$amount, $use_type, $new_gs, $client_request_id]);
+
+                $coin_limit_added = 0;
+                if ($use_type === "coin_limit_expand") {
+                    // 1スタンプ = +10コイン/日の上限拡張
+                    $coin_limit_added = $amount * 10;
+                    $date_key = date("Y-m-d");
+                    $stmt_daily = $pdo->prepare("SELECT daily_limit FROM coin_daily_usage WHERE user_id = ? AND date_key = ? FOR UPDATE");
+                    $stmt_daily->execute([$uid, $date_key]);
+                    $daily_row = $stmt_daily->fetch(PDO::FETCH_ASSOC);
+
+                    if ($daily_row) {
+                        $up_daily = $pdo->prepare("UPDATE coin_daily_usage SET daily_limit = daily_limit + ? WHERE user_id = ? AND date_key = ?");
+                        $up_daily->execute([$coin_limit_added, $uid, $date_key]);
+                    } else {
+                        $ins_daily = $pdo->prepare("INSERT INTO coin_daily_usage (user_id, date_key, used, daily_limit) VALUES (?, ?, 0, ?)");
+                        $ins_daily->execute([$uid, $date_key, 500 + $coin_limit_added]);
+                    }
+                }
+
+                $pdo->commit();
+
+                // 最新のdaily_limitを取得
+                $date_key = date("Y-m-d");
+                $stmt_dl = $pdo->prepare("SELECT daily_limit, used FROM coin_daily_usage WHERE user_id = ? AND date_key = ? LIMIT 1");
+                $stmt_dl->execute([$uid, $date_key]);
+                $dl_row = $stmt_dl->fetch(PDO::FETCH_ASSOC);
+
+                send_response(200, [
+                    "message" => "ok",
+                    "user_id" => $uid,
+                    "use_type" => $use_type,
+                    "gold_stamps_used" => $amount,
+                    "gold_stamp_balance" => $new_gs,
+                    "coin_limit_added" => $coin_limit_added,
+                    "daily_limit" => $dl_row ? (int)$dl_row["daily_limit"] : 500,
+                    "daily_used" => $dl_row ? (int)$dl_row["used"] : 0
+                ]);
+            } catch (PDOException $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                send_error(500, "db_error", "Database error", $e->getMessage());
+            } catch (Exception $e) {
+                if ($pdo->inTransaction()) $pdo->rollBack();
+                send_error(500, "server_error", "Server error", $e->getMessage());
+            }
+            break;
+        }
+
     default:
         send_error(400, "bad_request", "Unknown action", null, null, "error.unknown_action");
 }

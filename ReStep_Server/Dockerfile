@@ -1,6 +1,7 @@
 FROM php:8.3-fpm
 
-RUN docker-php-ext-install pdo pdo_mysql mysqli
+RUN apt-get update && apt-get install -y libcurl4-openssl-dev && rm -rf /var/lib/apt/lists/*
+RUN docker-php-ext-install pdo pdo_mysql mysqli curl
 
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 

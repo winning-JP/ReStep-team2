@@ -645,30 +645,58 @@ private extension HomeView {
     }
 
     private var quickLinksSection: some View {
-        HStack(spacing: 10) {
-            NavigationLink {
-                TargetView()
-            } label: {
-                HomeQuickLink(title: "成長", subtitle: "目標へ", icon: "leaf.fill", tint: .green)
-            }
-            .buttonStyle(.plain)
-            .frame(maxWidth: .infinity)
+        VStack(spacing: 10) {
+            HStack(spacing: 10) {
+                NavigationLink {
+                    TargetView()
+                } label: {
+                    HomeQuickLink(title: "成長", subtitle: "目標へ", icon: "leaf.fill", tint: .green)
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
 
-            NavigationLink {
-                RewardView()
-            } label: {
-                HomeQuickLink(title: "ご褒美", subtitle: "解放 \(stampsStore.balance)", icon: "crown.fill", tint: .orange)
-            }
-            .buttonStyle(.plain)
-            .frame(maxWidth: .infinity)
+                NavigationLink {
+                    RewardView()
+                } label: {
+                    HomeQuickLink(title: "ご褒美", subtitle: "解放 \(stampsStore.balance)", icon: "crown.fill", tint: .orange)
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
 
-            NavigationLink {
-                EncounterGameSelectView()
-            } label: {
-                HomeQuickLink(title: "すれ違い", subtitle: "探索へ", icon: "person.2.fill", tint: .teal)
+                NavigationLink {
+                    EncounterGameSelectView()
+                } label: {
+                    HomeQuickLink(title: "すれ違い", subtitle: "探索へ", icon: "person.2.fill", tint: .teal)
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.plain)
-            .frame(maxWidth: .infinity)
+
+            HStack(spacing: 10) {
+                NavigationLink {
+                    FogMapView()
+                } label: {
+                    HomeQuickLink(title: "地図埋め", subtitle: "探索マップ", icon: "map.fill", tint: .indigo)
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
+
+                NavigationLink {
+                    ArticleListView()
+                } label: {
+                    HomeQuickLink(title: "記事", subtitle: "みんなの投稿", icon: "doc.text.fill", tint: .mint)
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
+
+                NavigationLink {
+                    GoldStampView()
+                } label: {
+                    HomeQuickLink(title: "Gスタンプ", subtitle: "交換・使用", icon: "star.circle.fill", tint: .yellow)
+                }
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
+            }
         }
         .padding(.horizontal, 20)
     }

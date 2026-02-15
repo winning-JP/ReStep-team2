@@ -8,6 +8,10 @@ struct APIConfig {
     private static let runtimeProfileKey = "restep.api.profile_endpoint"
     private static let runtimeStatsKey = "restep.api.stats_endpoint"
     private static let runtimeWalletKey = "restep.api.wallet_endpoint"
+    private static let runtimeFogMapKey = "restep.api.fogmap_endpoint"
+    private static let runtimeArticleKey = "restep.api.article_endpoint"
+    private static let runtimeTreasureKey = "restep.api.treasure_endpoint"
+    private static let runtimeUploadKey = "restep.api.upload_endpoint"
 
     /// Runtime override for the base URL.
     /// Example: https://staging.example.com
@@ -59,6 +63,38 @@ struct APIConfig {
             runtimeKey: runtimeWalletKey,
             infoKey: "WALLET_API_ENDPOINT",
             defaultPath: "user_wallet_api.php"
+        )
+    }
+
+    static var fogMapAPIURL: URL {
+        resolveEndpoint(
+            runtimeKey: runtimeFogMapKey,
+            infoKey: "FOGMAP_API_ENDPOINT",
+            defaultPath: "fog_map_api.php"
+        )
+    }
+
+    static var articleAPIURL: URL {
+        resolveEndpoint(
+            runtimeKey: runtimeArticleKey,
+            infoKey: "ARTICLE_API_ENDPOINT",
+            defaultPath: "article_api.php"
+        )
+    }
+
+    static var treasureAPIURL: URL {
+        resolveEndpoint(
+            runtimeKey: runtimeTreasureKey,
+            infoKey: "TREASURE_API_ENDPOINT",
+            defaultPath: "treasure_api.php"
+        )
+    }
+
+    static var uploadAPIURL: URL {
+        resolveEndpoint(
+            runtimeKey: runtimeUploadKey,
+            infoKey: "UPLOAD_API_ENDPOINT",
+            defaultPath: "upload_api.php"
         )
     }
 
@@ -291,6 +327,226 @@ struct ChallengeClaimResponse: Codable {
     let unlocks: ChallengeUnlocks?
 }
 
+// MARK: - Coin Daily Usage
+
+struct CoinDailyUsageResponse: Codable {
+    let userId: Int
+    let dateKey: String
+    let used: Int
+    let dailyLimit: Int
+    let remaining: Int
+}
+
+struct CoinUseDailyResponse: Codable {
+    let message: String
+    let userId: Int
+    let used: Int
+    let balance: Int
+    let dailyUsed: Int
+    let dailyLimit: Int
+    let dailyRemaining: Int
+    let transactionId: Int
+    let idempotent: Bool
+}
+
+// MARK: - Gold Stamp
+
+struct GoldStampBalanceResponse: Codable {
+    let userId: Int
+    let balance: Int
+    let totalEarned: Int
+}
+
+struct GoldStampExchangeResponse: Codable {
+    let message: String
+    let userId: Int
+    let coinBalance: Int
+    let coinUsed: Int
+    let goldStampBalance: Int
+    let goldStampTotalEarned: Int
+}
+
+struct GoldStampUseResponse: Codable {
+    let message: String
+    let userId: Int
+    let useType: String
+    let goldStampsUsed: Int
+    let goldStampBalance: Int
+    let coinLimitAdded: Int
+    let dailyLimit: Int
+    let dailyUsed: Int
+}
+
+// MARK: - Fog Map
+
+struct FogVisitSyncResponse: Codable {
+    let message: String
+    let userId: Int
+    let inserted: Int
+}
+
+struct FogVisitItem: Codable, Identifiable {
+    let id: Int
+    let latitude: Double
+    let longitude: Double
+    let visitedAt: String
+}
+
+struct FogVisitListResponse: Codable {
+    let userId: Int
+    let items: [FogVisitItem]
+    let nextAfterId: Int?
+}
+
+struct WaypointAddResponse: Codable {
+    let message: String
+    let waypointId: Int
+    let userId: Int
+}
+
+struct WaypointItem: Codable, Identifiable {
+    let id: Int
+    let latitude: Double
+    let longitude: Double
+    let title: String?
+    let note: String?
+    let photoUrl: String?
+    let createdAt: String
+}
+
+struct WaypointListResponse: Codable {
+    let userId: Int
+    let items: [WaypointItem]
+}
+
+struct WaypointUpdateResponse: Codable {
+    let message: String
+    let waypointId: Int
+    let userId: Int
+    let title: String?
+    let note: String?
+    let photoUrl: String?
+}
+
+struct WaypointDeleteResponse: Codable {
+    let message: String
+    let deleted: Bool
+    let waypointId: Int
+}
+
+struct ImageUploadResponse: Codable {
+    let message: String
+    let url: String
+    let key: String
+    let userId: Int
+    let size: Int
+    let contentType: String
+}
+
+// MARK: - Article
+
+struct ArticlePostResponse: Codable {
+    let message: String
+    let articleId: Int
+    let coinBalance: Int
+    let coinUsed: Int
+}
+
+struct ArticleItem: Codable, Identifiable {
+    let id: Int
+    let userId: Int
+    let nickname: String
+    let title: String
+    let body: String
+    let imageUrl: String?
+    let viewCount: Int
+    let reactionCount: Int
+    let createdAt: String
+}
+
+struct ArticleListResponse: Codable {
+    let items: [ArticleItem]
+    let total: Int
+    let sort: String
+    let limit: Int
+    let offset: Int
+}
+
+struct ArticleDetailResponse: Codable {
+    let id: Int
+    let userId: Int
+    let nickname: String
+    let title: String
+    let body: String
+    let imageUrl: String?
+    let viewCount: Int
+    let reactionCount: Int
+    let createdAt: String
+    let userReactions: [String]
+}
+
+struct ArticleReactResponse: Codable {
+    let message: String
+    let articleId: Int
+    let type: String
+    let added: Bool
+    let reactionCount: Int
+}
+
+struct ArticleRankingItem: Codable, Identifiable {
+    let rank: Int
+    let id: Int
+    let userId: Int
+    let nickname: String
+    let title: String
+    let viewCount: Int
+    let reactionCount: Int
+    let createdAt: String
+}
+
+struct ArticleRankingResponse: Codable {
+    let rankBy: String
+    let items: [ArticleRankingItem]
+}
+
+// MARK: - Treasure / Puzzle
+
+struct TreasureOpenResponse: Codable {
+    let message: String
+    let userId: Int
+    let rewardType: String
+    let rewardValue: Int
+    let collectedPieces: [Int]?
+    let totalPieces: Int?
+    let isComplete: Bool?
+    let coinBalance: Int?
+    let actualPenalty: Int?
+    let expGained: Int?
+    let note: String?
+}
+
+struct PuzzlePieceItem: Codable {
+    let pieceIndex: Int
+    let obtainedAt: String
+}
+
+struct PuzzleStatusResponse: Codable {
+    let userId: Int
+    let puzzleId: Int
+    let pieces: [PuzzlePieceItem]
+    let collected: Int
+    let total: Int
+    let isComplete: Bool
+}
+
+struct PuzzleCompleteResponse: Codable {
+    let message: String
+    let userId: Int
+    let puzzleId: Int
+    let rewardCoins: Int
+    let coinBalance: Int
+}
+
 struct CoinRegisterResponse: Codable {
     let userId: Int
     let balance: Int
@@ -417,6 +673,11 @@ private enum WalletAction: String, Codable {
     case coinAdd = "coin_add"
     case coinRegister = "coin_register"
     case coinEarn = "coin_earn"
+    case coinDailyUsage = "coin_daily_usage"
+    case coinUseDaily = "coin_use_daily"
+    case goldStampGet = "gold_stamp_get"
+    case goldStampExchange = "gold_stamp_exchange"
+    case goldStampUse = "gold_stamp_use"
     case challengeList = "challenge_list"
     case challengeStatus = "challenge_status"
     case challengeClaim = "challenge_claim"
@@ -425,6 +686,29 @@ private enum WalletAction: String, Codable {
     case stampSpend = "stamp_spend"
     case stampAdd = "stamp_add"
     case stampHistory = "stamp_history"
+}
+
+private enum FogMapAction: String, Codable {
+    case visitSync = "visit_sync"
+    case visitList = "visit_list"
+    case waypointAdd = "waypoint_add"
+    case waypointList = "waypoint_list"
+    case waypointUpdate = "waypoint_update"
+    case waypointDelete = "waypoint_delete"
+}
+
+private enum ArticleAction: String, Codable {
+    case post
+    case list
+    case detail
+    case react
+    case ranking
+}
+
+private enum TreasureAction: String, Codable {
+    case openBox = "open_box"
+    case puzzleStatus = "puzzle_status"
+    case puzzleComplete = "puzzle_complete"
 }
 
 private struct RegisterRequest: Encodable {
@@ -578,6 +862,126 @@ private struct ChallengeClaimRequest: Encodable {
     let year: Int?
     let month: Int?
     let clientRequestId: String?
+}
+
+// MARK: - Coin Daily Usage Requests
+
+private struct CoinDailyUsageRequest: Encodable {
+    let action: WalletAction = .coinDailyUsage
+}
+
+private struct CoinUseDailyRequest: Encodable {
+    let action: WalletAction = .coinUseDaily
+    let amount: Int
+    let reason: String?
+    let clientRequestId: String?
+}
+
+// MARK: - Gold Stamp Requests
+
+private struct GoldStampGetRequest: Encodable {
+    let action: WalletAction = .goldStampGet
+}
+
+private struct GoldStampExchangeRequest: Encodable {
+    let action: WalletAction = .goldStampExchange
+    let clientRequestId: String?
+}
+
+private struct GoldStampUseRequest: Encodable {
+    let action: WalletAction = .goldStampUse
+    let amount: Int
+    let useType: String
+    let clientRequestId: String?
+}
+
+// MARK: - Fog Map Requests
+
+private struct FogVisitSyncRequest: Encodable {
+    let action: FogMapAction = .visitSync
+    let visits: [[String: String]]
+}
+
+private struct FogVisitListRequest: Encodable {
+    let action: FogMapAction = .visitList
+    let limit: Int?
+    let afterId: Int?
+}
+
+private struct WaypointAddRequest: Encodable {
+    let action: FogMapAction = .waypointAdd
+    let latitude: Double
+    let longitude: Double
+    let title: String?
+    let note: String?
+    let photoUrl: String?
+}
+
+private struct WaypointListRequest: Encodable {
+    let action: FogMapAction = .waypointList
+}
+
+private struct WaypointUpdateRequest: Encodable {
+    let action: FogMapAction = .waypointUpdate
+    let waypointId: Int
+    let title: String?
+    let note: String?
+    let photoUrl: String?
+}
+
+private struct WaypointDeleteRequest: Encodable {
+    let action: FogMapAction = .waypointDelete
+    let waypointId: Int
+}
+
+// MARK: - Article Requests
+
+private struct ArticlePostRequest: Encodable {
+    let action: ArticleAction = .post
+    let title: String
+    let body: String
+    let imageUrl: String?
+}
+
+private struct ArticleListRequest: Encodable {
+    let action: ArticleAction = .list
+    let sort: String
+    let limit: Int
+    let offset: Int
+}
+
+private struct ArticleDetailRequest: Encodable {
+    let action: ArticleAction = .detail
+    let articleId: Int
+}
+
+private struct ArticleReactRequest: Encodable {
+    let action: ArticleAction = .react
+    let articleId: Int
+    let type: String
+}
+
+private struct ArticleRankingRequest: Encodable {
+    let action: ArticleAction = .ranking
+    let rankBy: String
+    let limit: Int
+}
+
+// MARK: - Treasure Requests
+
+private struct TreasureOpenRequest: Encodable {
+    let action: TreasureAction = .openBox
+    let puzzleId: Int
+}
+
+private struct PuzzleStatusRequest: Encodable {
+    let action: TreasureAction = .puzzleStatus
+    let puzzleId: Int
+}
+
+private struct PuzzleCompleteRequest: Encodable {
+    let action: TreasureAction = .puzzleComplete
+    let puzzleId: Int
 }
 
 final class UserAPIClient {
@@ -905,6 +1309,50 @@ final class WalletAPIClient {
         return response
     }
 
+    // MARK: - Coin Daily Usage
+
+    func fetchCoinDailyUsage() async throws -> CoinDailyUsageResponse {
+        DebugLog.log("wallet.coin_daily_usage -> request")
+        let request = CoinDailyUsageRequest()
+        let response: CoinDailyUsageResponse = try await postWallet(request)
+        DebugLog.log("wallet.coin_daily_usage -> used=\(response.used) limit=\(response.dailyLimit) remaining=\(response.remaining)")
+        return response
+    }
+
+    func useCoinsDaily(amount: Int, reason: String?, clientRequestId: String?) async throws -> CoinUseDailyResponse {
+        DebugLog.log("wallet.coin_use_daily -> amount=\(amount) reason=\(reason ?? "-")")
+        let request = CoinUseDailyRequest(amount: amount, reason: reason, clientRequestId: clientRequestId)
+        let response: CoinUseDailyResponse = try await postWallet(request)
+        DebugLog.log("wallet.coin_use_daily -> balance=\(response.balance) dailyRemaining=\(response.dailyRemaining)")
+        return response
+    }
+
+    // MARK: - Gold Stamp
+
+    func fetchGoldStampBalance() async throws -> GoldStampBalanceResponse {
+        DebugLog.log("wallet.gold_stamp_get -> request")
+        let request = GoldStampGetRequest()
+        let response: GoldStampBalanceResponse = try await postWallet(request)
+        DebugLog.log("wallet.gold_stamp_get -> balance=\(response.balance) total=\(response.totalEarned)")
+        return response
+    }
+
+    func exchangeGoldStamp(clientRequestId: String?) async throws -> GoldStampExchangeResponse {
+        DebugLog.log("wallet.gold_stamp_exchange -> request")
+        let request = GoldStampExchangeRequest(clientRequestId: clientRequestId)
+        let response: GoldStampExchangeResponse = try await postWallet(request)
+        DebugLog.log("wallet.gold_stamp_exchange -> coinBalance=\(response.coinBalance) gsBalance=\(response.goldStampBalance)")
+        return response
+    }
+
+    func useGoldStamp(amount: Int, useType: String, clientRequestId: String?) async throws -> GoldStampUseResponse {
+        DebugLog.log("wallet.gold_stamp_use -> amount=\(amount) type=\(useType)")
+        let request = GoldStampUseRequest(amount: amount, useType: useType, clientRequestId: clientRequestId)
+        let response: GoldStampUseResponse = try await postWallet(request)
+        DebugLog.log("wallet.gold_stamp_use -> gsBalance=\(response.goldStampBalance) limitAdded=\(response.coinLimitAdded)")
+        return response
+    }
+
     func fetchStampHistory(limit: Int = 50, beforeId: Int? = nil) async throws -> StampHistoryResponse {
         DebugLog.log("wallet.stamp_history -> limit=\(limit) beforeId=\(beforeId?.description ?? "-")")
         let request = StampHistoryRequest(limit: limit, beforeId: beforeId)
@@ -957,4 +1405,255 @@ private struct StampHistoryRequest: Encodable {
     let action: WalletAction = .stampHistory
     let limit: Int
     let beforeId: Int?
+}
+
+// MARK: - Fog Map API Client
+
+final class FogMapAPIClient {
+    static let shared = FogMapAPIClient()
+
+    private let session: URLSession
+    private let decoder: JSONDecoder
+    private let encoder: JSONEncoder
+    private var apiURL: URL { APIConfig.fogMapAPIURL }
+
+    init(session: URLSession = .shared) {
+        self.session = session
+        self.decoder = JSONDecoder()
+        self.encoder = JSONEncoder()
+        self.decoder.keyDecodingStrategy = .convertFromSnakeCase
+        self.encoder.keyEncodingStrategy = .convertToSnakeCase
+    }
+
+    func syncVisits(_ visits: [(latitude: Double, longitude: Double, visitedAt: String)]) async throws -> FogVisitSyncResponse {
+        let visitsData = visits.map { [
+            "latitude": String($0.latitude),
+            "longitude": String($0.longitude),
+            "visited_at": $0.visitedAt
+        ] }
+        let request = FogVisitSyncRequest(visits: visitsData)
+        return try await postAPI(request)
+    }
+
+    func fetchVisits(limit: Int = 1000, afterId: Int? = nil) async throws -> FogVisitListResponse {
+        let request = FogVisitListRequest(limit: limit, afterId: afterId)
+        return try await postAPI(request)
+    }
+
+    func addWaypoint(latitude: Double, longitude: Double, title: String?, note: String?, photoUrl: String?) async throws -> WaypointAddResponse {
+        let request = WaypointAddRequest(latitude: latitude, longitude: longitude, title: title, note: note, photoUrl: photoUrl)
+        return try await postAPI(request)
+    }
+
+    func fetchWaypoints() async throws -> WaypointListResponse {
+        let request = WaypointListRequest()
+        return try await postAPI(request)
+    }
+
+    func updateWaypoint(waypointId: Int, title: String?, note: String?, photoUrl: String?) async throws -> WaypointUpdateResponse {
+        let request = WaypointUpdateRequest(waypointId: waypointId, title: title, note: note, photoUrl: photoUrl)
+        return try await postAPI(request)
+    }
+
+    func deleteWaypoint(waypointId: Int) async throws -> WaypointDeleteResponse {
+        let request = WaypointDeleteRequest(waypointId: waypointId)
+        return try await postAPI(request)
+    }
+
+    func uploadImage(imageData: Data, category: String = "waypoint") async throws -> ImageUploadResponse {
+        let uploadURL = APIConfig.uploadAPIURL
+        let boundary = "Boundary-\(UUID().uuidString)"
+
+        var request = URLRequest(url: uploadURL)
+        request.httpMethod = "POST"
+        request.httpShouldHandleCookies = true
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+
+        var body = Data()
+
+        // category field
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"category\"\r\n\r\n".data(using: .utf8)!)
+        body.append("\(category)\r\n".data(using: .utf8)!)
+
+        // image file
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"image\"; filename=\"photo.jpg\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+        body.append(imageData)
+        body.append("\r\n".data(using: .utf8)!)
+
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+        request.httpBody = body
+
+        let (data, response) = try await session.data(for: request)
+
+        if let apiError = try? decoder.decode(APIErrorResponse.self, from: data) {
+            let e = apiError.error
+            throw APIError.server(code: e.code, message: e.message, detail: e.detail, fields: e.fields, i18nKey: e.i18nKey)
+        }
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200..<300).contains(httpResponse.statusCode) else {
+            throw APIError.invalidResponse
+        }
+
+        return try decoder.decode(ImageUploadResponse.self, from: data)
+    }
+
+    private func postAPI<Request: Encodable, Response: Decodable>(_ body: Request) async throws -> Response {
+        var request = URLRequest(url: apiURL)
+        request.httpMethod = "POST"
+        request.httpShouldHandleCookies = true
+        request.httpBody = try encoder.encode(body)
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let (data, response) = try await session.data(for: request)
+
+        if let apiError = try? decoder.decode(APIErrorResponse.self, from: data) {
+            let e = apiError.error
+            throw APIError.server(code: e.code, message: e.message, detail: e.detail, fields: e.fields, i18nKey: e.i18nKey)
+        }
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200..<300).contains(httpResponse.statusCode) else {
+            throw APIError.invalidResponse
+        }
+
+        do {
+            return try decoder.decode(Response.self, from: data)
+        } catch {
+            throw APIError.decoding
+        }
+    }
+}
+
+// MARK: - Article API Client
+
+final class ArticleAPIClient {
+    static let shared = ArticleAPIClient()
+
+    private let session: URLSession
+    private let decoder: JSONDecoder
+    private let encoder: JSONEncoder
+    private var apiURL: URL { APIConfig.articleAPIURL }
+
+    init(session: URLSession = .shared) {
+        self.session = session
+        self.decoder = JSONDecoder()
+        self.encoder = JSONEncoder()
+        self.decoder.keyDecodingStrategy = .convertFromSnakeCase
+        self.encoder.keyEncodingStrategy = .convertToSnakeCase
+    }
+
+    func postArticle(title: String, body: String, imageUrl: String?) async throws -> ArticlePostResponse {
+        let request = ArticlePostRequest(title: title, body: body, imageUrl: imageUrl)
+        return try await postAPI(request)
+    }
+
+    func fetchArticles(sort: String = "new", limit: Int = 20, offset: Int = 0) async throws -> ArticleListResponse {
+        let request = ArticleListRequest(sort: sort, limit: limit, offset: offset)
+        return try await postAPI(request)
+    }
+
+    func fetchArticleDetail(articleId: Int) async throws -> ArticleDetailResponse {
+        let request = ArticleDetailRequest(articleId: articleId)
+        return try await postAPI(request)
+    }
+
+    func react(articleId: Int, type: String = "like") async throws -> ArticleReactResponse {
+        let request = ArticleReactRequest(articleId: articleId, type: type)
+        return try await postAPI(request)
+    }
+
+    func fetchRanking(rankBy: String = "reactions", limit: Int = 20) async throws -> ArticleRankingResponse {
+        let request = ArticleRankingRequest(rankBy: rankBy, limit: limit)
+        return try await postAPI(request)
+    }
+
+    private func postAPI<Request: Encodable, Response: Decodable>(_ body: Request) async throws -> Response {
+        var request = URLRequest(url: apiURL)
+        request.httpMethod = "POST"
+        request.httpShouldHandleCookies = true
+        request.httpBody = try encoder.encode(body)
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let (data, response) = try await session.data(for: request)
+
+        if let apiError = try? decoder.decode(APIErrorResponse.self, from: data) {
+            let e = apiError.error
+            throw APIError.server(code: e.code, message: e.message, detail: e.detail, fields: e.fields, i18nKey: e.i18nKey)
+        }
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200..<300).contains(httpResponse.statusCode) else {
+            throw APIError.invalidResponse
+        }
+
+        do {
+            return try decoder.decode(Response.self, from: data)
+        } catch {
+            throw APIError.decoding
+        }
+    }
+}
+
+// MARK: - Treasure API Client
+
+final class TreasureAPIClient {
+    static let shared = TreasureAPIClient()
+
+    private let session: URLSession
+    private let decoder: JSONDecoder
+    private let encoder: JSONEncoder
+    private var apiURL: URL { APIConfig.treasureAPIURL }
+
+    init(session: URLSession = .shared) {
+        self.session = session
+        self.decoder = JSONDecoder()
+        self.encoder = JSONEncoder()
+        self.decoder.keyDecodingStrategy = .convertFromSnakeCase
+        self.encoder.keyEncodingStrategy = .convertToSnakeCase
+    }
+
+    func openBox(puzzleId: Int = 1) async throws -> TreasureOpenResponse {
+        let request = TreasureOpenRequest(puzzleId: puzzleId)
+        return try await postAPI(request)
+    }
+
+    func fetchPuzzleStatus(puzzleId: Int = 1) async throws -> PuzzleStatusResponse {
+        let request = PuzzleStatusRequest(puzzleId: puzzleId)
+        return try await postAPI(request)
+    }
+
+    func completePuzzle(puzzleId: Int = 1) async throws -> PuzzleCompleteResponse {
+        let request = PuzzleCompleteRequest(puzzleId: puzzleId)
+        return try await postAPI(request)
+    }
+
+    private func postAPI<Request: Encodable, Response: Decodable>(_ body: Request) async throws -> Response {
+        var request = URLRequest(url: apiURL)
+        request.httpMethod = "POST"
+        request.httpShouldHandleCookies = true
+        request.httpBody = try encoder.encode(body)
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let (data, response) = try await session.data(for: request)
+
+        if let apiError = try? decoder.decode(APIErrorResponse.self, from: data) {
+            let e = apiError.error
+            throw APIError.server(code: e.code, message: e.message, detail: e.detail, fields: e.fields, i18nKey: e.i18nKey)
+        }
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200..<300).contains(httpResponse.statusCode) else {
+            throw APIError.invalidResponse
+        }
+
+        do {
+            return try decoder.decode(Response.self, from: data)
+        } catch {
+            throw APIError.decoding
+        }
+    }
 }

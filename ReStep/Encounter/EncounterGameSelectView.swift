@@ -15,13 +15,14 @@ struct EncounterGameSelectView: View {
     @State private var isLoadingBalance = false
     @State private var processedTravelerIds: Set<UUID> = []
     @ObservedObject private var health = HealthKitManager.shared
+    @StateObject private var coinTracker = CoinUsageTracker.shared
     private let wallet = WalletAPIClient.shared
 
     private var games: [EncounterGameItem] {
         var items: [EncounterGameItem] = [
             .init(title: "すれ違いレイド", subtitle: "協力で討伐", imageName: "すれ違い", isEnabled: true, lockText: nil, destination: AnyView(EncounterRaidView())),
             .init(title: "すれちがい伝説", subtitle: "冒険へ出発", imageName: "すれ違い", isEnabled: true, lockText: nil, destination: AnyView(EncounterLegendStartView())),
-            .init(title: "宝箱さがし", subtitle: "運試しミニゲーム", imageName: "宝探しゲーム", isEnabled: true, lockText: nil, destination: AnyView(EncounterTreasureView())),
+            .init(title: "宝箱さがし", subtitle: "運試しミニゲーム", imageName: "宝探しゲーム", isEnabled: true, lockText: nil, destination: AnyView(TreasureBoxView())),
             .init(
                 title: "すれ違いバトル",
                 subtitle: "1回限りの対決",
@@ -175,6 +176,7 @@ struct EncounterGameSelectView: View {
                 }
                 Task { await bootstrapWallet() }
                 Task { await loadChallengeUnlocks() }
+                Task { await coinTracker.refresh() }
             }
             .onDisappear {
                 manager.stop()
@@ -235,13 +237,18 @@ struct EncounterGameSelectView: View {
             Spacer()
 
             HStack(spacing: 8) {
-                HStack(spacing: 4) {
-                    Image(systemName: "circle.fill")
-                        .font(.caption2)
-                        .foregroundColor(.yellow)
-                    Text(isLoadingBalance ? "..." : "\(coinBalance)")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundColor(.primary)
+                VStack(spacing: 2) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "circle.fill")
+                            .font(.caption2)
+                            .foregroundColor(.yellow)
+                        Text(isLoadingBalance ? "..." : "\(coinBalance)")
+                            .font(.footnote.weight(.semibold))
+                            .foregroundColor(.primary)
+                    }
+                    Text("残\(coinTracker.remaining)/\(coinTracker.dailyLimit)")
+                        .font(.system(size: 9))
+                        .foregroundColor(.secondary)
                 }
                 .padding(.vertical, 6)
                 .padding(.horizontal, 10)
@@ -392,58 +399,6 @@ private struct EncounterGameItem: Identifiable {
     let destination: AnyView
 }
 
-struct EncounterTreasureView: View {
-    @State private var resultText: String = "宝箱を見つけた！"
-    @State private var hasOpened = false
-
-    var body: some View {
-        VStack(spacing: 16) {
-            Spacer()
-
-            Text("宝箱さがし")
-                .font(.title2.bold())
-
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color(.systemGray6))
-                .frame(height: 180)
-                .overlay(
-                    Image(systemName: hasOpened ? "shippingbox.fill" : "shippingbox")
-                        .font(.system(size: 64, weight: .semibold))
-                        .foregroundColor(.orange)
-                )
-
-            Text(resultText)
-                .font(.body.weight(.semibold))
-                .foregroundColor(.secondary)
-
-            Button {
-                let rewards = [
-                    "コイン +50",
-                    "スタンプ +1",
-                    "回復アイテム +1",
-                    "経験値 +20"
-                ]
-                resultText = rewards.randomElement() ?? "何も起きなかった"
-                hasOpened = true
-            } label: {
-                Text(hasOpened ? "もう一度ひく" : "宝箱を開ける")
-                    .font(.body.bold())
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
-                    .background(Color.orange)
-                    .clipShape(Capsule())
-            }
-            .padding(.horizontal, 20)
-
-            Spacer()
-        }
-        .padding()
-        .navigationTitle("宝箱さがし")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .tabBar)
-    }
-}
 
 #if DEBUG
 @available(iOS 17, *)

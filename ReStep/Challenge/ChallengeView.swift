@@ -109,6 +109,49 @@ struct ChallengeView: View {
                                 .padding(.horizontal)
                             }
                         }
+                        // QRチャレンジセクション
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("体験チャレンジ")
+                                .font(.headline)
+                                .padding(.horizontal)
+
+                            NavigationLink {
+                                QRChallengeView()
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "qrcode")
+                                        .font(.title2)
+                                        .foregroundStyle(.green)
+                                        .frame(width: 44, height: 44)
+                                        .background(Color.green.opacity(0.1))
+                                        .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("RIZAP / chocoZAP 体験")
+                                            .font(.subheadline.bold())
+                                            .foregroundStyle(.primary)
+                                        Text("QRコードを表示して体験参加")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+
+                                    Spacer()
+
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .padding()
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .fill(Color(.systemBackground))
+                                        .shadow(color: .black.opacity(0.05), radius: 4)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.horizontal)
+                        }
+
                         .padding(.bottom, 80)
                     }
                 }

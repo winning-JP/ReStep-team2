@@ -5,6 +5,8 @@ server {
     root /var/www/html/public;
     index index.php;
 
+    client_max_body_size 12M;
+
     add_header 'Access-Control-Allow-Origin' '${CORS_ORIGIN}' always;
     add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS' always;
     add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization' always;

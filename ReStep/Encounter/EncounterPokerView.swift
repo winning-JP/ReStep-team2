@@ -33,6 +33,7 @@ struct EncounterPokerView: View {
     @State private var phase: Phase = .ready
     @State private var resultText: String = "ディールしてね"
     private let wallet = WalletAPIClient.shared
+    @StateObject private var coinTracker = CoinUsageTracker.shared
     @State private var credits: Int = 0
     @State private var bet: Int = 1
     @State private var lastResult: (name: String, multiplier: Int) = ("", 0)
@@ -227,6 +228,10 @@ struct EncounterPokerView: View {
             resultText = "コインが足りません"
             return
         }
+        guard coinTracker.canUse(bet) else {
+            resultText = "本日のコイン使用上限(\(coinTracker.dailyLimit))に達しました"
+            return
+        }
 
         isSpending = true
         resultText = "コイン消費中..."
@@ -234,9 +239,10 @@ struct EncounterPokerView: View {
 
         Task {
             do {
-                let response = try await wallet.useCoins(amount: bet, reason: "poker", clientRequestId: requestId)
+                let response = try await wallet.useCoinsDaily(amount: bet, reason: "poker", clientRequestId: requestId)
                 await MainActor.run {
                     credits = response.balance
+                    coinTracker.recordUsage(bet)
                     incrementJackpot(by: bet)
                     isSpending = false
                     beginDeal()

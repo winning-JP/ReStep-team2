@@ -18,6 +18,46 @@ services:
     networks:
       - backend
 
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    ports:
+      - "${TS_IP}:9000:9000"
+      - "${TS_IP}:9001:9001"
+    networks:
+      - backend
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: minio-init
+    depends_on:
+      - minio
+    environment:
+      TZ: ${TZ}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+          until mc alias set local http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null; do sleep 1; done
+          mc admin info local >/dev/null
+          mc mb --ignore-existing "local/$MINIO_BUCKET"
+          mc anonymous set download "local/$MINIO_BUCKET"
+          mc anonymous get "local/$MINIO_BUCKET"
+    restart: "no"
+    networks:
+      - backend
+
   php:
     build: .
     container_name: php
@@ -29,10 +69,17 @@ services:
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+      MINIO_BUCKET: ${MINIO_BUCKET}
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL}
     volumes:
       - ./data/app:/var/www/html
+      - ./data/php/uploads.ini:/usr/local/etc/php/conf.d/uploads.ini:ro
     depends_on:
       - mariadb
+      - minio
     networks:
       - backend
 
@@ -86,3 +133,4 @@ networks:
 
 volumes:
   phpmyadmin_sessions:
+  minio_data:
