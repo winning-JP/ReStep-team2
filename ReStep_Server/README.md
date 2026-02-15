@@ -7,6 +7,8 @@ ReStep APIサーバーのDocker Compose環境です。
 | サービス | イメージ | 説明 |
 |----------|----------|------|
 | mariadb | mariadb:11 | データベースサーバー |
+| minio | minio/minio:latest | S3互換オブジェクトストレージ |
+| minio-init | minio/mc:latest | MinIOバケット初期化 |
 | php | カスタムビルド | PHP-FPMアプリケーション |
 | nginx | nginx:alpine | APIサーバー |
 | phpmyadmin | phpmyadmin:latest | データベース管理ツール |
@@ -57,6 +59,12 @@ CLOUDFLARE_TUNNEL_TOKEN=<トンネルトークン>
 API_HOST=<APIのホスト名>
 PMA_HOST=<phpMyAdminのホスト名>
 
+# MinIO (S3互換ストレージ)
+MINIO_ROOT_USER=<MinIOユーザー>
+MINIO_ROOT_PASSWORD=<MinIOパスワード>
+MINIO_BUCKET=restep-uploads
+MINIO_PUBLIC_URL=<公開アクセス用URL>
+
 # CORS設定
 CORS_ORIGIN=<許可するオリジン>
 ```
@@ -104,6 +112,7 @@ docker compose logs -f
 # 特定サービスのログ
 docker compose logs -f nginx
 docker compose logs -f php
+docker compose logs -f minio
 ```
 
 ### データベース操作
@@ -147,12 +156,12 @@ docker compose exec php composer require <パッケージ名>
 [Nginx] :80
     |
 [PHP-FPM] :9000
-    |
-[MariaDB] :3306
+[MariaDB] :3306    [MinIO] :9000 (console :9001)
 ```
 
 - Nginx は `127.0.0.1:8080` でローカルからアクセス可能
 - MariaDB は Tailscale IP 経由で外部接続可能
+- MinIO は `9000`（API）と `9001`（Console）を公開
 - 外部公開は Cloudflare Tunnel 経由のみ
 
 ## トラブルシューティング
@@ -201,6 +210,20 @@ docker compose up -d --force-recreate <サービス名>
    docker compose logs cloudflared
    ```
 
+### `docker compose` が permission denied になる
+
+`usermod -aG docker <user>` の直後は、同じSSHセッションにグループ変更が反映されません。
+
+```bash
+# 一時反映（または再ログイン）
+newgrp docker
+
+# 反映確認
+id -nG | grep docker
+```
+
+暫定回避としては `sudo docker compose ...` でも実行できます。
+
 ## データベース初期化
 
 初回起動時に `data/mariadb/init/` 内のSQLファイルが自動実行されます。
@@ -212,7 +235,7 @@ docker compose up -d --force-recreate <サービス名>
 ```bash
 # データを削除して再初期化
 docker compose down
-rm -rf data/db/*
+find data/db -mindepth 1 -delete
 docker compose up -d
 ```
 
@@ -224,13 +247,12 @@ docker compose up -d
 ├── Dockerfile
 ├── docker-entrypoint.sh  # コンテナ起動時の初期化スクリプト
 ├── .env.sample
-├── mariadb/
-│   └── init/             # DB初期化スクリプト
-│       └── 01_schema.sql
 └── data/
     ├── app/              # PHPアプリケーション
-    │   └── public/       # ドキュメントルート
+   │   └── public/       # ドキュメントルート
     ├── db/               # MariaDBデータ（永続化）
+    ├── mariadb/
+    │   └── init/         # DB初期化スクリプト
     └── nginx/
         └── default.conf.template
 ```

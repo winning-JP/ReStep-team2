@@ -53,12 +53,12 @@ ReStep は、iOS アプリ (`ReStep/`) と API サーバー (`ReStep_Server/`) �
 │  ├─ Profile/
 │  ├─ Services/
 │  └─ ...
-├─ ReStep_Server/          # APIサーバー (Docker + PHP + MariaDB + Nginx + Cloudflare Tunnel)
+├─ ReStep_Server/          # APIサーバー (Docker + PHP + MariaDB + MinIO + Nginx + Cloudflare Tunnel)
 │  ├─ docker-compose.yml
 │  ├─ Dockerfile
 │  ├─ .env.sample
 │  ├─ data/
-│  └─ mariadb/
+│  └─ doc/
 ├─ script/
 │  ├─ setup.sh             # EC2(Ubuntu) 初期セットアップ用（手動実行）
 │  └─ ec2-user-data.sh     # EC2 User data 用（起動時自動実行）
@@ -86,6 +86,7 @@ ReStep は、iOS アプリ (`ReStep/`) と API サーバー (`ReStep_Server/`) �
 ### API サーバー
 - PHP-FPM + Nginx
 - MariaDB 11
+- MinIO (S3互換オブジェクトストレージ)
 - Docker Compose
 - phpMyAdmin
 - Cloudflare Tunnel
@@ -153,6 +154,7 @@ cp .env.sample .env
 
 - `DB_ROOT_PASSWORD`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`
 - `TS_IP`, `NGINX_HOST`, `NGINX_PORT`
+- `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`, `MINIO_BUCKET`, `MINIO_PUBLIC_URL`
 - `CORS_ORIGIN`
 - `CLOUDFLARE_TUNNEL_TOKEN`（Cloudflare Tunnel を使う場合）
 
@@ -168,6 +170,16 @@ docker compose up -d --build
 docker compose ps
 docker compose logs -f
 ```
+
+`permission denied while trying to connect to the Docker daemon socket` が出る場合は、
+`docker` グループ反映前のセッションで実行している可能性があります。
+
+```bash
+newgrp docker
+id -nG | grep docker
+```
+
+または SSH 再ログイン後に再実行してください。
 
 ## 2) iOS アプリ起動
 
@@ -217,6 +229,7 @@ docker compose restart nginx
 # 特定サービスのログ
 docker compose logs -f php
 docker compose logs -f mariadb
+docker compose logs -f minio
 ```
 
 ## 注意事項
